@@ -12,7 +12,6 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build)
 
 # Add include folder
 include_directories(${CMAKE_SOURCE_DIR}/include)
-include_directories(/usr/include)  # system GLM path
 
 # Find external libraries
 find_package(OpenGL REQUIRED)
