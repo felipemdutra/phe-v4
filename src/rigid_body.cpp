@@ -4,6 +4,7 @@
 #include "../include/util/util.h"
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
+#include <iostream>
 #include <stdexcept>
 #include <wrapgl/mesh_factory.h>
 
@@ -50,7 +51,25 @@ RigidBody::~RigidBody()
         wgl::MeshFactory::DestroyMesh(mesh_);
 }
 
-void RigidBody::IntegrateLinearAcceleration(vec3 force, float dt)
+void RigidBody::SetPosition(const vec3 &pos)
+{
+        position_ = pos;
+        dirty_ = true;
+}
+
+void RigidBody::SetRotation(const quat &rot)
+{
+        rotation_ = rot;
+        dirty_ = true;
+}
+
+void RigidBody::SetScale(const vec3 &scale)
+{
+        scale_ = scale;
+        dirty_ = true;
+}
+
+void RigidBody::IntegrateLinearAcceleration(const vec3 &force, float dt)
 {
         vec3 acc = force / mass_;
 
@@ -58,12 +77,12 @@ void RigidBody::IntegrateLinearAcceleration(vec3 force, float dt)
         linear_velocity_ *= (1 - kDamping * dt);
 }
 
-void RigidBody::IntegrateLinearImpulse(glm::vec3 impulse)
+void RigidBody::IntegrateLinearImpulse(const vec3 &impulse)
 {
         linear_velocity_ += (impulse / mass_);
 }
 
-void RigidBody::IntegrateAngularAcceleration(vec3 force, vec3 r, float dt)
+void RigidBody::IntegrateAngularAcceleration(const vec3 &force, const vec3 &r, float dt)
 {
         mat3 R = mat3_cast(rotation_); // convert quaternion to 3x3 rotation
         mat3 I_world = R * inertia_tensor_ * transpose(R);
@@ -79,12 +98,12 @@ void RigidBody::IntegrateAngularAcceleration(vec3 force, vec3 r, float dt)
         vec3 net_torque = applied_torque - gyro_term;
 
         // use I_world to compute angular acceleration
-        vec3 angular_acc = inverse(I_world) * applied_torque;
+        vec3 angular_acc = inverse(I_world) * net_torque;
 
         angular_velocity_ += angular_acc * dt;
 }
 
-void RigidBody::IntegrateAngularImpulse(glm::vec3 impulse, glm::vec3 r)
+void RigidBody::IntegrateAngularImpulse(const vec3 &impulse, const vec3 &r)
 {
         vec3 angular_impulse = cross(r, impulse);
 
@@ -99,8 +118,8 @@ void RigidBody::IntegrateLinearVelocity(float dt)
 
 void RigidBody::IntegrateAngularVelocity(float dt)
 {
-        glm::quat omega_quat(0, angular_velocity_.x, angular_velocity_.y, angular_velocity_.z);
-        glm::quat q_dot = 0.5f * (omega_quat * rotation_);
+        quat omega_quat(0, angular_velocity_.x, angular_velocity_.y, angular_velocity_.z);
+        quat q_dot = 0.5f * (omega_quat * rotation_);
 
         rotation_ += dt * q_dot;
         rotation_ = glm::normalize(rotation_);
@@ -108,13 +127,13 @@ void RigidBody::IntegrateAngularVelocity(float dt)
         dirty_ = true;
 }
 
-void RigidBody::IntegrateAccelerations(glm::vec3 forces, glm::vec3 r, float dt)
+void RigidBody::IntegrateAccelerations(const vec3 &forces, const vec3 &r, float dt)
 {
         IntegrateLinearAcceleration(forces, dt);
         IntegrateAngularAcceleration(forces, r, dt);
 }
 
-void RigidBody::IntegrateImpulses(glm::vec3 impulses, glm::vec3 r, float dt)
+void RigidBody::IntegrateImpulses(const vec3 &impulses, const vec3 &r)
 {
         IntegrateLinearImpulse(impulses);
         IntegrateAngularImpulse(impulses, r);
@@ -132,7 +151,7 @@ void RigidBody::Draw(wgl::Renderer &renderer)
         mesh_->Draw(renderer);
 }
 
-glm::mat4 RigidBody::CalculateModelMatrix()
+mat4 RigidBody::CalculateModelMatrix()
 {
         if (!dirty_) {
                 return cached_model_;
