@@ -14,9 +14,10 @@
 
 using namespace glm;
 
-RigidBody::RigidBody(Shape shape, float mass, const vec3 &scale)
+RigidBody::RigidBody(Shape shape, float mass, const vec3 &scale, bool is_static)
 {
         mass_ = mass;
+        is_static_ = is_static;
 
         position_ = vec3(0.0f);
         rotation_ = quat(1.0f, 0.0f, 0.0f, 0.0f);
@@ -71,19 +72,30 @@ void RigidBody::SetScale(const vec3 &scale)
 
 void RigidBody::IntegrateLinearAcceleration(const vec3 &force, float dt)
 {
+        if (is_static_) {
+                return;
+        }
+
         vec3 acc = force / mass_;
 
         linear_velocity_ += acc * dt;
-        linear_velocity_ *= (1 - kDamping * dt);
 }
 
 void RigidBody::IntegrateLinearImpulse(const vec3 &impulse)
 {
+        if (is_static_) {
+                return;
+        }
+
         linear_velocity_ += (impulse / mass_);
 }
 
 void RigidBody::IntegrateAngularAcceleration(const vec3 &force, const vec3 &r, float dt)
 {
+        if (is_static_) {
+                return;
+        }
+
         mat3 R = mat3_cast(rotation_); // convert quaternion to 3x3 rotation
         mat3 I_world = R * inertia_tensor_ * transpose(R);
 
@@ -105,6 +117,10 @@ void RigidBody::IntegrateAngularAcceleration(const vec3 &force, const vec3 &r, f
 
 void RigidBody::IntegrateAngularImpulse(const vec3 &impulse, const vec3 &r)
 {
+        if (is_static_) {
+                return;
+        }
+
         vec3 angular_impulse = cross(r, impulse);
 
         angular_velocity_ += inverse(inertia_tensor_) * angular_impulse;
@@ -112,49 +128,79 @@ void RigidBody::IntegrateAngularImpulse(const vec3 &impulse, const vec3 &r)
 
 void RigidBody::IntegrateLinearVelocity(float dt)
 {
+        if (is_static_) {
+                return;
+        }
+
         position_ += linear_velocity_ * dt; 
+        linear_velocity_ *= (1 - kDamping * dt);
+
         dirty_ = true;
 }
 
 void RigidBody::IntegrateAngularVelocity(float dt)
 {
+        if (is_static_) {
+                return;
+        }
+
         quat omega_quat(0, angular_velocity_.x, angular_velocity_.y, angular_velocity_.z);
         quat q_dot = 0.5f * (omega_quat * rotation_);
 
         rotation_ += dt * q_dot;
         rotation_ = glm::normalize(rotation_);
 
+        angular_velocity_ *= (1.0f - kDamping * dt);
         dirty_ = true;
 }
 
 void RigidBody::IntegrateAccelerations(const vec3 &forces, const vec3 &r, float dt)
 {
+        if (is_static_) {
+                return;
+        }
+
         IntegrateLinearAcceleration(forces, dt);
         IntegrateAngularAcceleration(forces, r, dt);
 }
 
 void RigidBody::IntegrateImpulses(const vec3 &impulses, const vec3 &r)
 {
+        if (is_static_) {
+                return;
+        }
+
         IntegrateLinearImpulse(impulses);
         IntegrateAngularImpulse(impulses, r);
 }
 
 void RigidBody::IntegrateVelocities(float dt)
 {
+        if (is_static_) {
+                return;
+        }
+
         IntegrateLinearVelocity(dt);
         IntegrateAngularVelocity(dt);
 }
 
+const glm::mat3& RigidBody::GetInvInertiaWorld()
+{
+        UpdateCache();
+
+        return cached_inv_inertia_tensor;
+}
+
 void RigidBody::Draw(wgl::Renderer &renderer)
 {
-        renderer.SetUniformMatrix4f("model", CalculateModelMatrix());
+        renderer.SetUniformMatrix4f("model", GetModelMatrix());
         mesh_->Draw(renderer);
 }
 
-mat4 RigidBody::CalculateModelMatrix()
+void RigidBody::UpdateCache()
 {
         if (!dirty_) {
-                return cached_model_;
+                return;
         }
 
         mat4 model = mat4(1.0f);
@@ -162,9 +208,19 @@ mat4 RigidBody::CalculateModelMatrix()
         model *= toMat4(rotation_);
         model = scale(model, scale_);
 
+        cached_model_ = model;
+
+        auto rot_mat = toMat3(rotation_);
+
+        cached_inv_inertia_tensor = rot_mat * inverse(inertia_tensor_) * transpose(rot_mat);
+
         dirty_ = false;
 
-        cached_model_ = model;
+}
+
+mat4 RigidBody::GetModelMatrix()
+{
+        UpdateCache();
 
         return cached_model_;
 }

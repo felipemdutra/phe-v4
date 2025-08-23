@@ -46,11 +46,12 @@ int main(void)
                         0.1f,
                         1000.0f);
 
-        camera.SetPosition(vec3(0.0f, 0.0f, 30.0f));
+        camera.SetPosition(vec3(0.0f, 0.0f, 18.0f));
 
-        Pendulum pendulum(vec3(0.0f, 0.0f, 0.0f), 3.0f);
+        Pendulum pendulum(vec3(0.0f, 0.0f, 0.0f), 3.0f, true);
 
         bool is_first = true;
+        int frames = 0;
 
         while (!window.ShouldClose()) {
                 auto curr_t = std::chrono::high_resolution_clock::now();
@@ -64,8 +65,12 @@ int main(void)
                 pendulum.GetBob()->IntegrateLinearAcceleration(glm::vec3(0.0f, -kGravity * 2.0, 0.0f), dt);
 
                 if (is_first) {
-                        pendulum.GetBob()->IntegrateLinearImpulse(glm::vec3(60.0f, 0.0f, -80.0f));
+                        pendulum.GetBob()->IntegrateLinearImpulse(glm::vec3(30.0f, 0.0f, 0.0f));
                         is_first = false;
+                }
+
+                if (frames++ == 2000) {
+                        pendulum.GetBob()->IntegrateLinearImpulse(glm::vec3(60.0f, 0.0f, 50.0f));
                 }
 
                 pendulum.Draw(renderer);

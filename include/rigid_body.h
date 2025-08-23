@@ -25,15 +25,17 @@ class RigidBody {
         glm::vec3 angular_velocity_;
 
         glm::mat3 inertia_tensor_;
-
+        glm::mat3 cached_inv_inertia_tensor; // World inverse inertia tensor.
         glm::mat4 cached_model_;
+
         wgl::Mesh *mesh_;
 
+        bool is_static_;
         bool dirty_;
 
 public:
         RigidBody() = default;
-        RigidBody(Shape shape, float mass, const glm::vec3 &scale);
+        RigidBody(Shape shape, float mass, const glm::vec3 &scale, bool is_static);
         ~RigidBody();
 
         // @brief This method integrates linear acceleration into the linear 
@@ -59,11 +61,17 @@ public:
         void SetRotation(const glm::quat &rot);
         void SetScale(const glm::vec3 &scale);
 
+        inline void SetStatic() { is_static_ = true; };
+        inline void SetStatic(bool value) { is_static_ = value; }
+
         inline const glm::vec3& GetPosition() const { return position_; }
         inline const glm::quat& GetRotation() const { return rotation_; }
         inline const glm::vec3& GetScale() const { return scale_; }
 
+        inline bool IsStatic() const { return is_static_; }
+
         inline const glm::mat3& GetInertiaTensor() const { return inertia_tensor_; }
+        const glm::mat3& GetInvInertiaWorld();
 
         inline const glm::vec3& GetLinearVelocity() const { return linear_velocity_; }
         inline const glm::vec3& GetAngularVelocity() const { return angular_velocity_; }
@@ -73,9 +81,11 @@ public:
 
         inline float GetMass() const { return mass_; }
 
+        void UpdateCache();
+
         void Draw(wgl::Renderer &renderer);
 
-        glm::mat4 CalculateModelMatrix();
+        glm::mat4 GetModelMatrix();
 };
 
 #endif
