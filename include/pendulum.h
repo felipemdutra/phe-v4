@@ -2,30 +2,34 @@
 #define PENDULUM_H
 
 #include <glm/ext/vector_float3.hpp>
+#include <utility>
+#include <vector>
 #include <wrapgl/renderer.h>
 
 #include "rigid_body.h"
 
 class Pendulum {
-        RigidBody pivot_, bob_;
+        std::vector<RigidBody> bobs_;
 
-        glm::vec3 pivot_attach_, bob_attach_;
+        std::vector<glm::vec3> bobs_attach_;
 
-        // World position of the pivot and bob attachment point to each other.
-        glm::vec3 pivot_attach_wrld_, bob_attach_wrld_;
+        // World position of the bobs attachment point to each other.
+        // bobs_attach_wrld[i] are the attachment points to bobs_[i]
+        std::vector<glm::vec3> bobs_attach_wrld_;
 
         float rod_length_;
 
         unsigned int line_vao_, line_vbo_; 
 
 public:
-        Pendulum(const glm::vec3 &pivot_pos, float rod_length, bool is_static);
+        // @param num_bobs The number of bobs.
+        // @param rod_length The length of the rod between each bob.
+        // @param is_static Whether the first bob will be static or not.
+        Pendulum(const glm::vec3 &pos, size_t num_bobs, float rod_length, bool is_static);
 
-        void UpdatePivotAttachWorld();
-        void UpdateBobAttachWorld();
+        void UpdateBobAttachWorld(size_t i);
 
-        inline RigidBody* GetBob() { return &bob_; }
-        inline RigidBody* GetPivot() { return &pivot_; }
+        inline RigidBody* GetBob(size_t i) { return &bobs_[i]; }
 
         void Update(float dt);
 

@@ -25,7 +25,9 @@ class RigidBody {
         glm::vec3 angular_velocity_;
 
         glm::mat3 inertia_tensor_;
-        glm::mat3 cached_inv_inertia_tensor; // World inverse inertia tensor.
+
+        glm::mat3 cached_inv_inertia_tensor_; // World inverse inertia tensor.
+        glm::mat3 cached_inertia_tensor_;     // World inertia tensor.
         glm::mat4 cached_model_;
 
         wgl::Mesh *mesh_;
@@ -72,6 +74,7 @@ public:
 
         inline const glm::mat3& GetInertiaTensor() const { return inertia_tensor_; }
         const glm::mat3& GetInvInertiaWorld();
+        const glm::mat3& GetInertiaWorld();
 
         inline const glm::vec3& GetLinearVelocity() const { return linear_velocity_; }
         inline const glm::vec3& GetAngularVelocity() const { return angular_velocity_; }

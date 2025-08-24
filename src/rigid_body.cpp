@@ -1,16 +1,16 @@
 #include "../include/rigid_body.h"
-#include "../include/math/constants.h"
-#include "../include/math/math_utils.h"
-#include "../include/util/util.h"
+
 #include <glm/geometric.hpp>
 #include <glm/matrix.hpp>
-#include <iostream>
 #include <stdexcept>
 #include <wrapgl/mesh_factory.h>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
 #include <glm/ext/matrix_transform.hpp>
+
+#include "../include/math/math_utils.h"
+#include "../include/util/util.h"
 
 using namespace glm;
 
@@ -96,15 +96,13 @@ void RigidBody::IntegrateAngularAcceleration(const vec3 &force, const vec3 &r, f
                 return;
         }
 
-        mat3 R = mat3_cast(rotation_); // convert quaternion to 3x3 rotation
-        mat3 I_world = R * inertia_tensor_ * transpose(R);
-
+        auto I_world = GetInertiaTensor();
         // r is just the distance from the center of mass (position_) where
         // the force was applied.
         vec3 applied_torque = cross(r, force);
 
         // Gyroscopic term.
-        vec3 gyro_term = cross(angular_velocity_, (inertia_tensor_ * angular_velocity_));
+        vec3 gyro_term = cross(angular_velocity_, (I_world * angular_velocity_));
 
         // Total torque.
         vec3 net_torque = applied_torque - gyro_term;
@@ -123,7 +121,7 @@ void RigidBody::IntegrateAngularImpulse(const vec3 &impulse, const vec3 &r)
 
         vec3 angular_impulse = cross(r, impulse);
 
-        angular_velocity_ += inverse(inertia_tensor_) * angular_impulse;
+        angular_velocity_ += GetInvInertiaWorld() * angular_impulse;
 }
 
 void RigidBody::IntegrateLinearVelocity(float dt)
@@ -133,7 +131,7 @@ void RigidBody::IntegrateLinearVelocity(float dt)
         }
 
         position_ += linear_velocity_ * dt; 
-        linear_velocity_ *= (1 - kDamping * dt);
+        //linear_velocity_ *= (1 - kDamping * dt);
 
         dirty_ = true;
 }
@@ -150,7 +148,7 @@ void RigidBody::IntegrateAngularVelocity(float dt)
         rotation_ += dt * q_dot;
         rotation_ = glm::normalize(rotation_);
 
-        angular_velocity_ *= (1.0f - kDamping * dt);
+        //angular_velocity_ *= (1.0f - kDamping * dt);
         dirty_ = true;
 }
 
@@ -184,11 +182,18 @@ void RigidBody::IntegrateVelocities(float dt)
         IntegrateAngularVelocity(dt);
 }
 
+const glm::mat3& RigidBody::GetInertiaWorld()
+{
+        UpdateCache();
+
+        return cached_inertia_tensor_;
+}
+
 const glm::mat3& RigidBody::GetInvInertiaWorld()
 {
         UpdateCache();
 
-        return cached_inv_inertia_tensor;
+        return cached_inv_inertia_tensor_;
 }
 
 void RigidBody::Draw(wgl::Renderer &renderer)
@@ -212,7 +217,8 @@ void RigidBody::UpdateCache()
 
         auto rot_mat = toMat3(rotation_);
 
-        cached_inv_inertia_tensor = rot_mat * inverse(inertia_tensor_) * transpose(rot_mat);
+        cached_inertia_tensor_     = rot_mat * inertia_tensor_ * transpose(rot_mat);
+        cached_inv_inertia_tensor_ = rot_mat * inverse(inertia_tensor_) * transpose(rot_mat);
 
         dirty_ = false;
 

@@ -46,9 +46,10 @@ int main(void)
                         0.1f,
                         1000.0f);
 
-        camera.SetPosition(vec3(0.0f, 0.0f, 18.0f));
+        camera.SetPosition(vec3(0.0f, 0.0f, 30.0f));
 
-        Pendulum pendulum(vec3(0.0f, 0.0f, 0.0f), 3.0f, true);
+        Pendulum pendulum1(vec3(5.0f, 0.0f, 0.0f), 3, 4.0f, true);
+        Pendulum pendulum2(vec3(-5.0f, 0.0f, 0.0f), 3, 4.0f, true);
 
         bool is_first = true;
         int frames = 0;
@@ -61,20 +62,31 @@ int main(void)
                 renderer.Clear(0.1, 0.1, 0.1, 1.0f, true);
                 camera.Update();
 
-                // Apply gravity.
-                pendulum.GetBob()->IntegrateLinearAcceleration(glm::vec3(0.0f, -kGravity * 2.0, 0.0f), dt);
+                for (size_t i = 0; i < 3; ++i) {
+                        // Apply gravity.
+                        pendulum1.GetBob(i)->IntegrateLinearAcceleration(glm::vec3(0.0f, -kGravity * 6.0, 0.0f), dt);
+                        pendulum2.GetBob(i)->IntegrateLinearAcceleration(glm::vec3(0.0f, -kGravity * 6.0, 0.0f), dt);
 
-                if (is_first) {
-                        pendulum.GetBob()->IntegrateLinearImpulse(glm::vec3(30.0f, 0.0f, 0.0f));
-                        is_first = false;
+                        if (is_first) {
+                                pendulum1.GetBob(1)->IntegrateLinearImpulse(glm::vec3(0.001f, 0.0f, 0.0f));
+                                pendulum2.GetBob(1)->IntegrateLinearImpulse(glm::vec3(0.001f, 0.0f, 0.0f));
+                                is_first = false;
+                        }
+
+                        if (frames++ == 1000) {
+                                pendulum1.GetBob(2)->IntegrateLinearImpulse(glm::vec3(100.0f, 0.0f, 0.0f));
+                                pendulum2.GetBob(2)->IntegrateLinearImpulse(glm::vec3(100.0f, 0.0f, 0.0f));
+                                pendulum1.GetBob(1)->IntegrateLinearImpulse(glm::vec3(-150.0f, 0.0f, 0.0f));
+                                pendulum2.GetBob(1)->IntegrateLinearImpulse(glm::vec3(-150.0f, 0.0f, 0.0f));
+                                //pendulum.GetBob(1)->IntegrateLinearImpulse(glm::vec3(-200.0f, 0.0f, 0.0f));
+                        }
                 }
 
-                if (frames++ == 2000) {
-                        pendulum.GetBob()->IntegrateLinearImpulse(glm::vec3(60.0f, 0.0f, 50.0f));
-                }
+                pendulum1.Update(dt);
+                pendulum2.Update(dt);
 
-                pendulum.Draw(renderer);
-                pendulum.Update(dt);
+                pendulum1.Draw(renderer);
+                pendulum2.Draw(renderer);
 
                 window.SwapBuffers();
 
