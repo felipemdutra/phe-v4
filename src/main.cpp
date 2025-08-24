@@ -7,7 +7,7 @@
 
 #include <GLFW/glfw3.h>
 
-#include "../include/rigid_body.h"
+#include "../include/pendulum.h"
 #include "../include/math/constants.h"
 
 constexpr float kInitialWindowWidth  = 800.0f;
@@ -46,13 +46,13 @@ int main(void)
                         0.1f,
                         1000.0f);
 
-        camera.SetPosition(vec3(0.0f, 2.5f, 8.0f));
-        camera.SetRotation(vec3(/*pitch*/-20.0f, /*yaw*/-90.0f, 0.0f));
+        camera.SetPosition(vec3(0.0f, 0.0f, 30.0f));
 
-        RigidBody body = RigidBody(Shape::kPyramid, 5.0f, vec3(1.0f, 1.0f, 1.0f));
-        //body.IntegrateLinearVelocity(glm::vec3(0.0f, 20.0f, -60.0f, dt);
+        Pendulum pendulum1(vec3(5.0f, 0.0f, 0.0f), 3, 4.0f, true);
+        Pendulum pendulum2(vec3(-5.0f, 0.0f, 0.0f), 3, 4.0f, true);
 
         bool is_first = true;
+        int frames = 0;
 
         while (!window.ShouldClose()) {
                 auto curr_t = std::chrono::high_resolution_clock::now();
@@ -62,17 +62,31 @@ int main(void)
                 renderer.Clear(0.1, 0.1, 0.1, 1.0f, true);
                 camera.Update();
 
-                // Apply gravity.
-                body.IntegrateLinearAcceleration(glm::vec3(0.0f, -kGravity * 2.0, 0.0f), dt);
+                for (size_t i = 0; i < 3; ++i) {
+                        // Apply gravity.
+                        pendulum1.GetBob(i)->IntegrateLinearAcceleration(glm::vec3(0.0f, -kGravity * 6.0, 0.0f), dt);
+                        pendulum2.GetBob(i)->IntegrateLinearAcceleration(glm::vec3(0.0f, -kGravity * 6.0, 0.0f), dt);
 
-                if (is_first) {
-                        body.IntegrateImpulses(glm::vec3(10.0f, 20.0f, -60.0f), glm::vec3(0.080f, 0.030f, 0.080f), dt);
-                        is_first = false;
+                        if (is_first) {
+                                pendulum1.GetBob(1)->IntegrateLinearImpulse(glm::vec3(0.001f, 0.0f, 0.0f));
+                                pendulum2.GetBob(1)->IntegrateLinearImpulse(glm::vec3(0.001f, 0.0f, 0.0f));
+                                is_first = false;
+                        }
+
+                        if (frames++ == 1000) {
+                                pendulum1.GetBob(2)->IntegrateLinearImpulse(glm::vec3(100.0f, 0.0f, 0.0f));
+                                pendulum2.GetBob(2)->IntegrateLinearImpulse(glm::vec3(100.0f, 0.0f, 0.0f));
+                                pendulum1.GetBob(1)->IntegrateLinearImpulse(glm::vec3(-150.0f, 0.0f, 0.0f));
+                                pendulum2.GetBob(1)->IntegrateLinearImpulse(glm::vec3(-150.0f, 0.0f, 0.0f));
+                                //pendulum.GetBob(1)->IntegrateLinearImpulse(glm::vec3(-200.0f, 0.0f, 0.0f));
+                        }
                 }
 
-                body.IntegrateVelocities(dt);
+                pendulum1.Update(dt);
+                pendulum2.Update(dt);
 
-                body.Draw(renderer);
+                pendulum1.Draw(renderer);
+                pendulum2.Draw(renderer);
 
                 window.SwapBuffers();
 
