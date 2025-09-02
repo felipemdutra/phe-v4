@@ -1,4 +1,5 @@
 #include <chrono>
+#include <glm/ext/vector_float3.hpp>
 #include <wrapgl/wrapgl.h>
 #include <glm/glm.hpp>
 
@@ -8,6 +9,8 @@
 #include <GLFW/glfw3.h>
 
 #include "../include/pendulum.h"
+#include "../include/soft_body.h"
+#include "../include/util/util.h"
 #include "../include/math/constants.h"
 
 constexpr float kInitialWindowWidth  = 800.0f;
@@ -46,47 +49,48 @@ int main(void)
                         0.1f,
                         1000.0f);
 
-        camera.SetPosition(vec3(0.0f, 0.0f, 30.0f));
+        camera.SetPosition(vec3(0.0f, 0.0f, 40.0f));
 
-        Pendulum pendulum1(vec3(5.0f, 0.0f, 0.0f), 3, 4.0f, true);
-        Pendulum pendulum2(vec3(-5.0f, 0.0f, 0.0f), 3, 4.0f, true);
+        Pendulum p1(vec3(-5.0f, 0.0f, 0.0f), 3, 3.0f, true);
+        Pendulum p2(vec3(5.0f, 0.0f, 0.0f), 3, 3.0f, true);
 
-        bool is_first = true;
+        RigidBody b(Shape::kPyramid, 5.0f, vec3(1.0f, 1.0f, 1.0f), false);
+
+        bool primeiro = true;
         int frames = 0;
+
+        //SoftBody sb(vec3(0.0f, 0.0f, 0.0f), 0.1f, 1.0);
 
         while (!window.ShouldClose()) {
                 auto curr_t = std::chrono::high_resolution_clock::now();
                 dt = std::chrono::duration<float>(curr_t - prev_t).count();
                 prev_t = curr_t;
 
-                renderer.Clear(0.1, 0.1, 0.1, 1.0f, true);
+                renderer.Clear(0.1f, 0.1f, 0.1f, 1.0f, true);
                 camera.Update();
 
-                for (size_t i = 0; i < 3; ++i) {
-                        // Apply gravity.
-                        pendulum1.GetBob(i)->IntegrateLinearAcceleration(glm::vec3(0.0f, -kGravity * 6.0, 0.0f), dt);
-                        pendulum2.GetBob(i)->IntegrateLinearAcceleration(glm::vec3(0.0f, -kGravity * 6.0, 0.0f), dt);
+                for (int i = 0; i < 3; i++) {
+                        p1.GetBob(i)->IntegrateLinearAcceleration(vec3(0.0f, -kGravity, 0.0f), dt);
+                        p2.GetBob(i)->IntegrateLinearAcceleration(vec3(0.0f, -kGravity, 0.0f), dt);
 
-                        if (is_first) {
-                                pendulum1.GetBob(1)->IntegrateLinearImpulse(glm::vec3(0.001f, 0.0f, 0.0f));
-                                pendulum2.GetBob(1)->IntegrateLinearImpulse(glm::vec3(0.001f, 0.0f, 0.0f));
-                                is_first = false;
-                        }
+                        if (primeiro == true) {
+                                frames += 1;
+                                if (frames == 1000) {
+                                        p1.GetBob(2)->IntegrateLinearImpulse(vec3(130.0f, 0.0f, 0.0f));
+                                        p2.GetBob(2)->IntegrateLinearImpulse(vec3(130.0f, 0.0f, 0.0f));
 
-                        if (frames++ == 1000) {
-                                pendulum1.GetBob(2)->IntegrateLinearImpulse(glm::vec3(100.0f, 0.0f, 0.0f));
-                                pendulum2.GetBob(2)->IntegrateLinearImpulse(glm::vec3(100.0f, 0.0f, 0.0f));
-                                pendulum1.GetBob(1)->IntegrateLinearImpulse(glm::vec3(-150.0f, 0.0f, 0.0f));
-                                pendulum2.GetBob(1)->IntegrateLinearImpulse(glm::vec3(-150.0f, 0.0f, 0.0f));
-                                //pendulum.GetBob(1)->IntegrateLinearImpulse(glm::vec3(-200.0f, 0.0f, 0.0f));
+                                        p1.GetBob(1)->IntegrateLinearImpulse(vec3(-90.0f, 0.0f, 0.0f));
+                                        p2.GetBob(1)->IntegrateLinearImpulse(vec3(-90.0f, 0.0f, 0.0f));
+                                        primeiro = false;
+                                }
                         }
                 }
 
-                pendulum1.Update(dt);
-                pendulum2.Update(dt);
+                p1.Update(dt);
+                p2.Update(dt);
 
-                pendulum1.Draw(renderer);
-                pendulum2.Draw(renderer);
+                p1.Draw(renderer);
+                p2.Draw(renderer);
 
                 window.SwapBuffers();
 

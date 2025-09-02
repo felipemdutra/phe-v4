@@ -33,11 +33,11 @@ RigidBody::RigidBody(Shape shape, float mass, const vec3 &scale, bool is_static)
         switch (shape) {
                 case kCube:
                         inertia_tensor_ = GetCubeInertiaTensor(mass_, scale.x, scale.y, scale.z);
-                        mesh_ = wgl::MeshFactory::GetCube(layout, &rgb);
+                        mesh_ = wgl::MeshFactory::GetCube(layout, &rgb, false);
                         break;
                 case kPyramid:
                         inertia_tensor_ = GetSquarePyramidInertiaTensor(mass_, scale.z, scale.y);
-                        mesh_ = wgl::MeshFactory::GetPyramid(layout, &rgb);
+                        mesh_ = wgl::MeshFactory::GetPyramid(layout, &rgb, false);
                         break;
                 default:
                         throw std::runtime_error("What?");

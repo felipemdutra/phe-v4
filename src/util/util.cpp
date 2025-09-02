@@ -2,8 +2,6 @@
 
 #include <wrapgl/vertex_layout.h>
 
-static bool setup = false;
-
 wgl::VertexLayout GetGlobalVertexLayout()
 {
         static wgl::VertexLayout layout;
