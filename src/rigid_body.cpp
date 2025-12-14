@@ -96,7 +96,7 @@ void RigidBody::IntegrateAngularAcceleration(const vec3 &force, const vec3 &r, f
                 return;
         }
 
-        auto I_world = GetInertiaTensor();
+        auto I_world = GetInvInertiaWorld();
         // r is just the distance from the center of mass (position_) where
         // the force was applied.
         vec3 applied_torque = cross(r, force);
@@ -108,7 +108,7 @@ void RigidBody::IntegrateAngularAcceleration(const vec3 &force, const vec3 &r, f
         vec3 net_torque = applied_torque - gyro_term;
 
         // use I_world to compute angular acceleration
-        vec3 angular_acc = inverse(I_world) * net_torque;
+        vec3 angular_acc = I_world * net_torque;
 
         angular_velocity_ += angular_acc * dt;
 }

@@ -6,46 +6,55 @@
 #include <memory>
 #include <unordered_map>
 #include <vector>
-#include <wrapgl/renderer.h>
 
 using std::vector;
+
+const float PHI = (1.0f + sqrt(5.0f)) / 2.0f; // Golden ratio
 
 static inline uint64_t edge_key(unsigned int a, unsigned int b) {
         if (a < b) return (uint64_t(a) << 32) | uint64_t(b);
         return (uint64_t(b) << 32) | uint64_t(a);
 }
 
-IcoSphere::IcoSphere(wgl::VertexLayout layout, float radius, unsigned int n)
+std::vector<glm::ivec3> IcoSphere::GetTriangles() const
 {
-        const float phi = (1.0f + sqrt(5.0f)) / 2.0f; // Golden ratio
-        
-        vector<glm::vec3> vertices = {
-                // Group 1: (0, ±1, ±φ)
-                { 0.0f,  1.0f,  phi },  // 0
-                { 0.0f, -1.0f,  phi },  // 1  
-                { 0.0f,  1.0f, -phi },  // 2
-                { 0.0f, -1.0f, -phi },  // 3
+        auto indices = GetIndices();
 
-                // Group 2: (±1, ±φ, 0)
-                { 1.0f,  phi, 0.0f },   // 4
-                {-1.0f,  phi, 0.0f },   // 5
-                { 1.0f, -phi, 0.0f },   // 6
-                {-1.0f, -phi, 0.0f },   // 7
+        std::vector<glm::ivec3> triangles;
+        triangles.reserve(indices.size());
 
-                // Group 3: (±φ, 0, ±1)
-                { phi, 0.0f,  1.0f },   // 8
-                {-phi, 0.0f,  1.0f },   // 9
-                { phi, 0.0f, -1.0f },   // 10
-                {-phi, 0.0f, -1.0f }    // 11
+        for (size_t i = 0; i < indices.size(); i += 3) {
+                triangles.push_back({ indices[i+0], indices[i+1], indices[i+2] });
+        }
+
+        return triangles;
+}
+
+void IcoSphere::SetupVerticesVao(wgl::VertexLayout layout, float radius, u32 nsubdivisions)
+{
+        vector<glm::vec3> identity_vertices = {
+                { 0.0f,  1.0f,  PHI },
+                { 0.0f, -1.0f,  PHI },
+                { 0.0f,  1.0f, -PHI },
+                { 0.0f, -1.0f, -PHI },
+
+                { 1.0f,  PHI, 0.0f },
+                {-1.0f,  PHI, 0.0f },
+                { 1.0f, -PHI, 0.0f },
+                {-1.0f, -PHI, 0.0f },
+
+                { PHI, 0.0f,  1.0f },
+                {-PHI, 0.0f,  1.0f },
+                { PHI, 0.0f, -1.0f },
+                {-PHI, 0.0f, -1.0f }
         }; 
 
         // Normalize each vertex.
-        for (auto &vertex : vertices) {
+        for (auto &vertex : identity_vertices) {
                 vertex = glm::normalize(vertex) * radius;
         }
 
-        // Corrected triangle indices with consistent counter-clockwise winding
-        vector<unsigned int> indices = {
+        vector<unsigned int> identity_indices = {
                 // Triangles around vertex 0 (top front)
                 0, 8, 4,
                 0, 4, 5,
@@ -77,9 +86,9 @@ IcoSphere::IcoSphere(wgl::VertexLayout layout, float radius, unsigned int n)
                 7, 9, 11
         };
 
-        for (unsigned int i = 0; i < n; ++i) {
-                vector<unsigned int> new_indices;
-                new_indices.reserve(indices.size() * 4);
+        for (unsigned int i = 0; i < nsubdivisions; ++i) {
+                vector<unsigned int> indices;
+                indices.reserve(identity_indices.size() * 4);
 
                 std::unordered_map<uint64_t, unsigned int> midpoint_cache;
                 midpoint_cache.reserve(indices.size() / 2);
@@ -93,76 +102,82 @@ IcoSphere::IcoSphere(wgl::VertexLayout layout, float radius, unsigned int n)
                         }
 
                         // Calculate midpoint, normalize to sphere surface
-                        glm::vec3 mid = (vertices[ia] + vertices[ib]) * 0.5f;
+                        glm::vec3 mid = (identity_vertices[ia] + identity_vertices[ib]) * 0.5f;
                         mid = glm::normalize(mid) * radius;
                         
-                        unsigned int mid_index = (unsigned int)vertices.size();
-                        vertices.push_back(mid);
+                        unsigned int mid_index = (unsigned int)identity_vertices.size();
+                        identity_vertices.push_back(mid);
                         midpoint_cache[key] = mid_index;
 
                         return mid_index;
                 };
 
                 // For each triangle, create 4 new triangles using midpoints
-                for (size_t i = 0; i < indices.size(); i += 3) {
-                        unsigned int ia = indices[i];
-                        unsigned int ib = indices[i + 1];
-                        unsigned int ic = indices[i + 2];
+                for (size_t i = 0; i < identity_indices.size(); i += 3) {
+                        unsigned int ia = identity_indices[i];
+                        unsigned int ib = identity_indices[i + 1];
+                        unsigned int ic = identity_indices[i + 2];
 
                         unsigned int m_ab = get_midpoint(ia, ib);
                         unsigned int m_bc = get_midpoint(ib, ic);
                         unsigned int m_ca = get_midpoint(ic, ia);
 
                         // Create 4 new triangles, preserving winding order
-                        new_indices.push_back(ia);
-                        new_indices.push_back(m_ab);
-                        new_indices.push_back(m_ca);
+                        indices.push_back(ia);
+                        indices.push_back(m_ab);
+                        indices.push_back(m_ca);
 
-                        new_indices.push_back(ib);
-                        new_indices.push_back(m_bc);
-                        new_indices.push_back(m_ab);
+                        indices.push_back(ib);
+                        indices.push_back(m_bc);
+                        indices.push_back(m_ab);
 
-                        new_indices.push_back(ic);
-                        new_indices.push_back(m_ca);
-                        new_indices.push_back(m_bc);
+                        indices.push_back(ic);
+                        indices.push_back(m_ca);
+                        indices.push_back(m_bc);
 
-                        new_indices.push_back(m_ab);
-                        new_indices.push_back(m_bc);
-                        new_indices.push_back(m_ca);
+                        indices.push_back(m_ab);
+                        indices.push_back(m_bc);
+                        indices.push_back(m_ca);
                 }
 
-                indices.swap(new_indices);
+                identity_indices.swap(indices);
         }
 
-        vector<float> new_vertices;
+        vector<float> vertices;
 
-        for (const auto &v : vertices) {
-                new_vertices.push_back(v.x);
-                new_vertices.push_back(v.y);
-                new_vertices.push_back(v.z);
+        for (const auto &v : identity_vertices) {
+                vertices.push_back(v.x);
+                vertices.push_back(v.y);
+                vertices.push_back(v.z);
 
-                new_vertices.push_back(1.0f);
-                new_vertices.push_back(0.0f);
-                new_vertices.push_back(0.0f);
+                vertices.push_back(1.0f);
+                vertices.push_back(0.0f);
+                vertices.push_back(0.0f);
         }
 
-        vertices_ = new_vertices;
-        indices_ = indices;
+        vertices_ = vertices;
+        indices_ = identity_indices;
 
         mesh_ = std::make_unique<wgl::Mesh>(layout, vertices_, indices_, true);
 
-        // Build VBO for black dots
+}
+
+void IcoSphere::SetupDotsVao()
+{
+        // Build VBO for white dots
         vector<float> dot_vertices;
-        dot_vertices.reserve(vertices.size() * 6); // position + color
+        dot_vertices.reserve(vertices_.size() * 6); // position + color
 
-        for (const auto &v : vertices) {
-                dot_vertices.push_back(v.x);
-                dot_vertices.push_back(v.y);
-                dot_vertices.push_back(v.z);
+        for (size_t i = 0; i < vertices_.size(); i += 6) {
+                // Position.
+                dot_vertices.push_back(vertices_[i + 0]);
+                dot_vertices.push_back(vertices_[i + 1]);
+                dot_vertices.push_back(vertices_[i + 2]);
 
-                dot_vertices.push_back(1.0f); // R
-                dot_vertices.push_back(1.0f); // G
-                dot_vertices.push_back(1.0f); // B
+                // Color.
+                dot_vertices.push_back(1.0f);
+                dot_vertices.push_back(1.0f);
+                dot_vertices.push_back(1.0f);
         }
 
         glGenVertexArrays(1, &dots_vao_);
@@ -185,20 +200,23 @@ IcoSphere::IcoSphere(wgl::VertexLayout layout, float radius, unsigned int n)
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, vertex_size, (void*)(sizeof(float) * 3));
 
         glBindVertexArray(0);
+}
 
+void IcoSphere::SetupWireframeVao()
+{
         // Build VBO for wireframe edges
         vector<float> edge_vertices;
-        edge_vertices.reserve(indices.size() * 2 * 6); // 2 vertices per edge, 6 floats per vertex (pos + color)
+        edge_vertices.reserve(indices_.size() * 2 * 6); // 2 vertices per edge, 6 floats per vertex (pos + color)
 
-        for (size_t i = 0; i < indices.size(); i += 3) {
-                unsigned int ia = indices[i];
-                unsigned int ib = indices[i + 1]; 
-                unsigned int ic = indices[i + 2];
+        for (size_t i = 0; i < indices_.size(); i += 3) {
+                unsigned int ia = indices_[i];
+                unsigned int ib = indices_[i + 1]; 
+                unsigned int ic = indices_[i + 2];
 
                 // Get vertex positions (remembering vertices are now in the flattened array)
-                glm::vec3 va(new_vertices[ia * 6], new_vertices[ia * 6 + 1], new_vertices[ia * 6 + 2]);
-                glm::vec3 vb(new_vertices[ib * 6], new_vertices[ib * 6 + 1], new_vertices[ib * 6 + 2]);
-                glm::vec3 vc(new_vertices[ic * 6], new_vertices[ic * 6 + 1], new_vertices[ic * 6 + 2]);
+                glm::vec3 va(vertices_[ia * 6], vertices_[ia * 6 + 1], vertices_[ia * 6 + 2]);
+                glm::vec3 vb(vertices_[ib * 6], vertices_[ib * 6 + 1], vertices_[ib * 6 + 2]);
+                glm::vec3 vc(vertices_[ic * 6], vertices_[ic * 6 + 1], vertices_[ic * 6 + 2]);
 
                 // Edge A->B
                 edge_vertices.insert(edge_vertices.end(), {va.x, va.y, va.z, 0.0f, 0.0f, 0.0f});
@@ -224,7 +242,7 @@ IcoSphere::IcoSphere(wgl::VertexLayout layout, float radius, unsigned int n)
 
         edge_vertex_count_ = edge_vertex_count;
 
-        glBufferData(GL_ARRAY_BUFFER, edge_vertex_size * edge_vertex_count, edge_vertices.data(), GL_STATIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, edge_vertex_size * edge_vertex_count, edge_vertices.data(), GL_DYNAMIC_DRAW);
 
         // Wireframe position
         glEnableVertexAttribArray(0);
@@ -237,38 +255,59 @@ IcoSphere::IcoSphere(wgl::VertexLayout layout, float radius, unsigned int n)
         glBindVertexArray(0);
 }
 
-void IcoSphere::UpdateVertexBuffer() const
+IcoSphere::IcoSphere(wgl::VertexLayout layout, float radius, unsigned int n)
 {
-        mesh_->UpdateVertexBuffer(vertices_);
+        // Do not change order of setup!
+        SetupVerticesVao(layout, radius, n);
+
+        SetupDotsVao();
+
+        SetupWireframeVao();
 }
 
-void IcoSphere::
-UpdateVertexPositions(const std::vector<glm::vec3> &new_vertex_positions)
+
+void IcoSphere::UpdateVerticesVbo(const std::vector<glm::vec3> &new_vertex_positions)
 {
+        assert(new_vertex_positions.size() == GetPointCount());
         for (size_t i = 0; i < vertices_.size(); i += 6) {
                 vertices_[i+0] = new_vertex_positions[i/6].x;
                 vertices_[i+1] = new_vertex_positions[i/6].y;
                 vertices_[i+2] = new_vertex_positions[i/6].z;
         }
 
-        UpdateVertexBuffer();
+        mesh_->UpdateVertexBuffer(vertices_);
 
+}
+
+void IcoSphere::UpdateDotsVbo(const std::vector<glm::vec3> &new_vertex_positions)
+{
         // Update dots VBO
-        std::vector<float> dot_vertices;
-        dot_vertices.reserve(new_vertex_positions.size() * 6);
+        vector<float> dot_vertices;
+        dot_vertices.reserve(GetPointCount() * 6); // position + color
 
-        for (const auto &v : new_vertex_positions) {
-                dot_vertices.push_back(v.x);
-                dot_vertices.push_back(v.y);
-                dot_vertices.push_back(v.z);
-                dot_vertices.push_back(1.0f); // R
-                dot_vertices.push_back(1.0f); // G
-                dot_vertices.push_back(1.0f); // B
+        for (size_t i = 0; i < GetPointCount(); ++i) {
+                // Position.
+                dot_vertices.push_back(new_vertex_positions[i].x);
+                dot_vertices.push_back(new_vertex_positions[i].y);
+                dot_vertices.push_back(new_vertex_positions[i].z);
+
+                // Color.
+                dot_vertices.push_back(1.0f);
+                dot_vertices.push_back(1.0f);
+                dot_vertices.push_back(1.0f);
         }
 
-        glBindBuffer(GL_ARRAY_BUFFER, dots_vbo_);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, dot_vertices.size() * sizeof(float), dot_vertices.data());
+        const GLsizeiptr vertex_size  = sizeof(float) * 6;
+        const GLsizeiptr vertex_count = dot_vertices.size() / 6;
 
+        glBindBuffer(GL_ARRAY_BUFFER, dots_vbo_);
+        assert(glGetError() == GL_NO_ERROR);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, vertex_count * vertex_size, dot_vertices.data());
+        assert(glGetError() == GL_NO_ERROR);
+}
+
+void IcoSphere::UpdateWireframeVbo(const std::vector<glm::vec3> &new_vertex_positions)
+{
         // Update wireframe VBO
         std::vector<float> edge_vertices;
         edge_vertices.reserve(indices_.size() * 2 * 6); // 2 vertices per edge, 6 floats per vertex
@@ -296,9 +335,34 @@ UpdateVertexPositions(const std::vector<glm::vec3> &new_vertex_positions)
         }
 
         glBindBuffer(GL_ARRAY_BUFFER, wireframe_vbo_);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, edge_vertices.size() * sizeof(float), edge_vertices.data());
 
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        // Check current buffer size
+        GLint current_buffer_size;
+        glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &current_buffer_size);
+
+        GLint required_size = edge_vertices.size() * sizeof(float);
+
+        if (required_size > current_buffer_size) {
+                // Buffer too small, reallocate
+                glBufferData(GL_ARRAY_BUFFER, required_size, edge_vertices.data(), GL_DYNAMIC_DRAW);
+                // Update the stored count
+                edge_vertex_count_ = edge_vertices.size() / 6;
+        } else {
+                // Buffer is large enough, just update
+                glBufferSubData(GL_ARRAY_BUFFER, 0, required_size, edge_vertices.data());
+        }
+
+        assert(glGetError() == GL_NO_ERROR);
+}
+
+void IcoSphere::
+UpdateVertexPositions(const std::vector<glm::vec3> &new_vertex_positions)
+{
+        UpdateVerticesVbo(new_vertex_positions);
+
+        UpdateDotsVbo(new_vertex_positions);
+
+        UpdateWireframeVbo(new_vertex_positions);
 }
 
 std::vector<float>& IcoSphere::GetVertices()
@@ -308,9 +372,10 @@ std::vector<float>& IcoSphere::GetVertices()
 
 void IcoSphere::Draw(wgl::Renderer &renderer)
 { 
+        renderer.SetUniformMatrix4f("model", glm::mat4(1.0f));
         mesh_->Draw(renderer);
 
-        glPointSize(5.0f);
+        glPointSize(3.0f);
         renderer.DrawArrays(dots_vao_, GL_POINTS, static_cast<GLsizei>(vertices_.size() / 6));
 
         glLineWidth(3.0f);

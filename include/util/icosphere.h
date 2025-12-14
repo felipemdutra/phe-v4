@@ -8,6 +8,10 @@
 #include <wrapgl/wrapgl.h>
 #include <memory>
 
+typedef unsigned int u32;
+typedef long unsigned int u64;
+typedef short unsigned int u16;
+
 class IcoSphere {
         std::unique_ptr<wgl::Mesh> mesh_;
 
@@ -20,8 +24,13 @@ class IcoSphere {
 
         GLsizeiptr edge_vertex_count_;
 
-        // @brief Updates the vertex buffer with the vertices vector.
-        void UpdateVertexBuffer() const;
+        void SetupVerticesVao(wgl::VertexLayout layout, float radius, u32 nsubdivisions);
+        void SetupDotsVao();
+        void SetupWireframeVao();
+
+        void UpdateVerticesVbo(const std::vector<glm::vec3> &new_vertex_positions);
+        void UpdateDotsVbo(const std::vector<glm::vec3> &new_vertex_positions);
+        void UpdateWireframeVbo(const std::vector<glm::vec3> &new_vertex_positions);
 
 public:
         IcoSphere();
@@ -31,8 +40,6 @@ public:
 
         void Draw(wgl::Renderer &renderer);
 
-        inline size_t GetPointCount() const { return vertices_.size() / 6; };
-
         // @brief Returns the vertices vectors, which includes position and
         //        color values, in the following layout:
         //
@@ -40,6 +47,14 @@ public:
         //        
         //        so 1 vertex is composed of 6 floats inside the vector.
         std::vector<float>& GetVertices();
+        const std::vector<u32>& GetIndices() const { return indices_; }
+
+        std::vector<glm::vec3>& GetPointPositions();
+        inline size_t GetPointCount() const { return vertices_.size() / 6; };
+
+        // @brief Returns a vector of ivec3's that contain the position of
+        // each triangle of the Ico Sphere.
+        std::vector<glm::ivec3> GetTriangles() const;
 
         // @brief Updates the Ico Sphere's vertex positions with the new
         //        positions.
@@ -51,8 +66,6 @@ public:
         // @note The @param new_vertex_positions shouldn't contain color 
         //       values, just vec3s with x, y and z values.
         void UpdateVertexPositions(const std::vector<glm::vec3> &new_vertex_positions);
-
-        std::vector<glm::vec3>& GetPointPositions();
 };
 
 #endif
